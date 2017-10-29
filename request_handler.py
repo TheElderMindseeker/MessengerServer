@@ -9,7 +9,13 @@ def request_handler(sock, addr):
     while True:
         request = recv_from_socket(sock)
         #may do another While True for handshaked case (do not check if handshaked every time)
-        if flag_handshaked:
+        if not flag_handshaked:
+            if request == 'Vkontakte is dead!':
+                flag_handshaked = True
+                send_by_socket(sock, 'Long live Telegram!\0', addr)
+            else:
+                send_by_socket(sock, 'Wrong handshake!\0', addr)
+        else:
             if request.split(':', maxsplit=1)[0] == 'Login':
                 login = request.split(':', maxsplit=1)[1]
                 cur.execute("SELECT count(*) FROM users WHERE login_name=\'?\';", login)
@@ -25,12 +31,6 @@ def request_handler(sock, addr):
                 break;
             else:
                 send_by_socket(sock, request, addr)
-        else:
-            if request == 'Vkontakte is dead!':
-                flag_handshaked = True
-                send_by_socket(sock, 'Long live Telegram!\0', addr)
-            else:
-                send_by_socket(sock, 'Wrong handshake!\0', addr)
 
     sock.close()
 
