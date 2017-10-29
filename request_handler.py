@@ -1,13 +1,37 @@
+import sqlite3
+
+
 def request_handler(sock, addr):
+    flag_handshaked = False
+    user_id = -1
+    con = sqlite3.connect(":memory:")
+    cur = con.cursor()
     while True:
         request = recv_from_socket(sock)
-        if request == 'Hello':
-            send_by_socket(sock, 'Hi!', addr)
-        elif request == 'Bye':
-            send_by_socket(sock, 'Bye!', addr)
-            break
+        #may do another While True for handshaked case (do not check if handshaked every time)
+        if flag_handshaked:
+            if request.split(':', maxsplit=1)[0] == 'Login':
+                login = request.split(':', maxsplit=1)[1]
+                cur.execute("SELECT count(*) FROM users WHERE login_name=\'?\';", login)
+                count = cur.fetchone()
+                if count[0] == 0:
+                    cur.execute("INSERT INTO users VALUES (?);", (login))
+                send_by_socket(sock, 'Successful\0', addr)
+            elif request=='Get list of users':
+                cur.execute("SELECT GROUP_CONCAT(login_name SEPARATOR\';\') FROM users;")
+                send_by_socket(sock, 'Successful;'+cur.fetchone() + '\0', addr)
+            elif request=='Disconnect':
+                send_by_socket(sock, 'Bye\0', addr)
+                break;
+            else:
+                send_by_socket(sock, request, addr)
         else:
-            send_by_socket(sock, 'I don\'t understand you\0', addr)
+            if request == 'Vkontakte is dead!':
+                flag_handshaked = True
+                send_by_socket(sock, 'Long live Telegram!\0', addr)
+            else:
+                send_by_socket(sock, 'Wrong handshake!\0', addr)
+
     sock.close()
 
 
