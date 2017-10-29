@@ -31,6 +31,23 @@ def request_handler(sock, addr):
             for row in cursor.fetchall():
                 response += ';' + row[0]
             send_by_socket(sock, response, addr)
+        elif request[:4] == 'Send':
+            receiver_nick, message_body = request[5:].split(';', maxsplit=1)
+            cursor.execute('''SELECT user_id FROM users WHERE login_name=?''', (receiver_nick,))
+            receiver_id = cursor.fetchone()
+            if receiver_id is None:
+                issue_error_message(sock, 'Unknown User', addr)
+                continue
+            receiver_id = receiver_id[0]
+            cursor.execute('''INSERT INTO messages
+                            (sender_id, receiver_id, timestamp, message_body)
+                              VALUES
+                            (?, ?, datetime(\'now\'), ?)''', (user_id, receiver_id, message_body))
+            connection.commit()
+            cursor.execute('''SELECT timestamp FROM messages WHERE message_id=last_insert_rowid()''')
+            timestamp = cursor.fetchone()[0]
+            answer = 'Successful;' + timestamp
+            send_by_socket(sock, answer, addr)
         elif request == 'Disconnect':
             send_by_socket(sock, 'Bye!', addr)
             break
