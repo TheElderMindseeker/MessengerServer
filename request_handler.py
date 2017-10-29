@@ -1,20 +1,42 @@
 import sqlite3
 
 def request_handler(sock, addr):
+    flag_handshaked = False
+    user_id = -1
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
 
     while True:
         request = recv_from_socket(sock)
-        if request == 'Get list of users':
+        # may do another While True for handshaked case (do not check if handshaked every time)
+        if request == 'Vkontakte is dead!':
+            if not flag_handshaked:
+                flag_handshaked = True
+                send_by_socket(sock, 'Long live Telegram!', addr)
+            else:
+                issue_error_message(sock, '', addr)
+                break
+        elif request[:5] == 'Login':
+            if request.split(':', maxsplit=1)[0] == 'Login':
+                login = request.split(':', maxsplit=1)[1]
+                cursor.execute("SELECT count(*) FROM users WHERE login_name=\'?\';", login)
+                count = cursor.fetchone()
+                if count[0] == 0:
+                    cursor.execute("INSERT INTO users (login_name) VALUES (?);", (login))
+                send_by_socket(sock, 'Successful', addr)
+        elif request == 'Get list of users':
             cursor.execute('''SELECT login_name FROM users;''')
-            user_list = ''
+            response = 'Success'
             for row in cursor.fetchall():
-                user_list += ';' + row[0]
-            response = 'Success' + user_list
+                response += ';' + row[0]
             send_by_socket(sock, response, addr)
+        elif request == 'Disconnect':
+            send_by_socket(sock, 'Bye!', addr)
+            break
         else:
-            issue_error_message(sock, 'Unknown Request', addr)
+            break
+
+    issue_error_message(sock, 'Unknown Request', addr)
     sock.close()
 
 
