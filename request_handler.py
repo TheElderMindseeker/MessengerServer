@@ -1,5 +1,6 @@
 import sqlite3
 
+
 def request_handler(sock, addr):
     flag_handshaked = False
     user_id = -1
@@ -16,17 +17,27 @@ def request_handler(sock, addr):
             else:
                 issue_error_message(sock, '', addr)
                 break
-        elif request[:5] == 'Login':
-            if request.split(':', maxsplit=1)[0] == 'Login':
-                login = request.split(':', maxsplit=1)[1]
-                cursor.execute("SELECT count(*) FROM users WHERE login_name=?;", (login,))
-                count = cursor.fetchone()
-                if count[0] == 0:
-                    cursor.execute("INSERT INTO users (login_name) VALUES (?);", (login,))
-                    connection.commit()
-                send_by_socket(sock, 'Successful', addr)
+        elif request[:5] == 'Login' and user_id == -1:
+            login = request.split(':', maxsplit=1)[1]
+            cursor.execute("SELECT count(*) FROM users WHERE login_name=?;", (login,))
+            count = cursor.fetchone()
+            if count[0] == 0:
+                cursor.execute("INSERT INTO users (login_name) VALUES (?);", (login,))
+                connection.commit()
+            cursor.execute("SELECT user_id FROM users WHERE login_name=?;", (login,))
+            user_id = cursor.fetchone()
+            send_by_socket(sock, 'Successful', addr)
         elif request == 'Get list of users':
             cursor.execute('''SELECT login_name FROM users;''')
+            response = 'Success'
+            for row in cursor.fetchall():
+                response += ';' + row[0]
+            send_by_socket(sock, response, addr)
+        elif request[:12] == 'Get messages' and user_id != -1:
+            time = request[13:]
+            cursor.execute('''SELECT * FROM messages 
+                           WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>:time''',
+                           {"user_id": user_id, "time": time})
             response = 'Success'
             for row in cursor.fetchall():
                 response += ';' + row[0]
