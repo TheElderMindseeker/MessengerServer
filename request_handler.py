@@ -33,6 +33,15 @@ def request_handler(sock, addr):
             for row in cursor.fetchall():
                 response += ';' + row[0]
             send_by_socket(sock, response, addr)
+        elif request[:12] == 'Get messages' and user_id != -1:
+            time = request[13:]
+            cursor.execute('''SELECT * FROM messages 
+                           WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>:time''',
+                           {"user_id": user_id, "time": time})
+            response = 'Success'
+            for row in cursor.fetchall():
+                response += ';' + row[0]
+            send_by_socket(sock, response, addr)
         elif request == 'Disconnect':
             send_by_socket(sock, 'Bye!', addr)
             break
