@@ -19,10 +19,11 @@ def request_handler(sock, addr):
         elif request[:5] == 'Login':
             if request.split(':', maxsplit=1)[0] == 'Login':
                 login = request.split(':', maxsplit=1)[1]
-                cursor.execute("SELECT count(*) FROM users WHERE login_name=\'?\';", login)
+                cursor.execute("SELECT count(*) FROM users WHERE login_name=?;", (login,))
                 count = cursor.fetchone()
                 if count[0] == 0:
-                    cursor.execute("INSERT INTO users (login_name) VALUES (?);", (login))
+                    cursor.execute("INSERT INTO users (login_name) VALUES (?);", (login,))
+                    connection.commit()
                 send_by_socket(sock, 'Successful', addr)
         elif request == 'Get list of users':
             cursor.execute('''SELECT login_name FROM users;''')
@@ -34,29 +35,29 @@ def request_handler(sock, addr):
             send_by_socket(sock, 'Bye!', addr)
             break
         else:
+            issue_error_message(sock, 'Unknown Request', addr)
             break
 
-    issue_error_message(sock, 'Unknown Request', addr)
     sock.close()
 
 
 def send_by_socket(socket, string, address=None):
     if address is None:
-        socket.sendall(bytes(string + '\0', 'ascii'))
+        socket.sendall(bytes(string + '\n', 'ascii'))
     else:
-        socket.sendto(bytes(string + '\0', 'ascii'), address)
+        socket.sendto(bytes(string + '\n', 'ascii'), address)
 
 
 def issue_error_message(socket, error, address=None):
     if address is None:
-        socket.sendall(bytes('Error;' + error + '\0', 'ascii'))
+        socket.sendall(bytes('Error;' + error + '\n', 'ascii'))
     else:
-        socket.sendto(bytes('Error;' + error + '\0', 'ascii'), address)
+        socket.sendto(bytes('Error;' + error + '\n', 'ascii'), address)
 
 
 def recv_from_socket(socket, address=None):
     buffer = b''
-    while str(buffer, 'ascii').find('\0') == -1:
+    while str(buffer, 'ascii').find('\n') == -1:
         if address is None:
             buffer += socket.recv(1024)
         else:
@@ -65,6 +66,6 @@ def recv_from_socket(socket, address=None):
                 raise ValueError
 
     s = str(buffer, 'ascii')
-    s = s[:s.find('\0')]
+    s = s[:s.find('\n')]
 
     return s
