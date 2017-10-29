@@ -1,13 +1,20 @@
+import sqlite3
+
 def request_handler(sock, addr):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+
     while True:
         request = recv_from_socket(sock)
-        if request == 'Hello':
-            send_by_socket(sock, 'Hi!', addr)
-        elif request == 'Bye':
-            send_by_socket(sock, 'Bye!', addr)
-            break
+        if request == 'Get list of users':
+            cursor.execute('''SELECT login_name FROM users;''')
+            user_list = ''
+            for row in cursor.fetchall():
+                user_list += ';' + row[0]
+            response = 'Success' + user_list
+            send_by_socket(sock, response, addr)
         else:
-            send_by_socket(sock, 'I don\'t understand you\0', addr)
+            issue_error_message(sock, 'Unknown Request', addr)
     sock.close()
 
 
