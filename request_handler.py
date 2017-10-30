@@ -42,7 +42,7 @@ def request_handler(sock, addr):
             cursor.execute('''SELECT login, timestamp, message_body 
                             FROM(
                                 SELECT 
-                                 IF(receiver_id=:user_id, receiver_id, sender_id) as login_id,
+                                 CASE WHEN receiver_id=:user_id THEN receiver_id ELSE sender_id END as login_id,
                                  message_body,
                                  timestamp
                                 FROM messages 
