@@ -115,6 +115,23 @@ def request_handler(sock, addr):
             answer = 'Successful;' + timestamp
             send_by_socket(sock, answer, addr)
 
+        elif request[:10] == 'Recv file;':
+            file_id = int(request[10:])
+            cursor.execute('''SELECT file_size, compression_type, encoding_type, file_name 
+                                      FROM files WHERE file_id=?''', (file_id,))
+            row = cursor.fetchone()
+            answer = 'Successful;'
+            answer += 'Size:' + str(row[0]) + ";"
+            answer += 'Compression-Type:' + str(row[1]) + ";"
+            answer += 'Coding-Type:' + str(row[2]) + ";"
+            send_by_socket(sock, answer, addr)
+
+            request = recv_from_socket(sock)
+            if request == 'Accepting;':
+                path = 'files/' + str(row[3])
+                file = open(path, "rb")
+                send_file_by_socket(sock, file.read(), addr)
+
         elif request == 'Disconnect':
             send_by_socket(sock, 'Bye!', addr)
             break
@@ -165,3 +182,10 @@ def recv_file_from_socket(socket, file_size, address=None):
             raise ValueError
         buffer = bs
     return buffer
+
+
+def send_file_by_socket(socket, string, address=None):
+    if address is None:
+        socket.sendall(string)
+    else:
+        socket.sendto(string, address)
