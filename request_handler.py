@@ -39,7 +39,7 @@ def request_handler(sock, addr):
 
         elif request[:13] == 'Get messages;' and user_id != -1:
             time = request[13:]
-            cursor.execute('''SELECT login, timestamp, message_body 
+            cursor.execute('''SELECT login_name, timestamp, message_body 
                             FROM(
                                 SELECT 
                                  CASE WHEN receiver_id=:user_id THEN receiver_id ELSE sender_id END as login_id,
@@ -50,7 +50,7 @@ def request_handler(sock, addr):
                                 )mes 
                                  INNER JOIN
                                 users
-                                ON mes.login_id=users.id''',
+                                ON mes.login_id=users.user_id''',
                            {"user_id": user_id, "time": time})
             response = 'Success'
             for row in cursor.fetchall():
