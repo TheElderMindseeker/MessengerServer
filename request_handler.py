@@ -10,7 +10,12 @@ def request_handler(sock, addr):
     while True:
         request = recv_from_socket(sock)
         # may do another While True for handshaked case (do not check if handshaked every time)
-        if request == 'Vkontakte is dead!':
+        if request == 'test':
+            flag_handshaked = True
+            cursor.execute("SELECT user_id FROM users WHERE login_name='Daniil';")
+            user_id = cursor.fetchone()
+            send_by_socket(sock, 'Successful; Hello Daniil', addr)
+        elif request == 'Vkontakte is dead!':
             if not flag_handshaked:
                 flag_handshaked = True
                 send_by_socket(sock, 'Long live Telegram!', addr)
