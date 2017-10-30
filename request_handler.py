@@ -9,7 +9,7 @@ def request_handler(sock, addr):
 
     while True:
         request = recv_from_socket(sock)
-        # may do another While True for handshaked case (do not check if handshaked every time)
+
         if request == 'Vkontakte is dead!':
             if not flag_handshaked:
                 flag_handshaked = True
