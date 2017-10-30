@@ -40,7 +40,7 @@ def request_handler(sock, addr):
             send_by_socket(sock, response, addr)
         elif request[:12] == 'Get messages' and user_id != -1:
             time = request[13:]
-            cursor.execute('''SELECT login, message_body, timestamp 
+            cursor.execute('''SELECT login, timestamp, message_body 
                             FROM(
                                 SELECT 
                                  IF(receiver_id=:user_id, receiver_id, sender_id) as login_id,
@@ -48,10 +48,11 @@ def request_handler(sock, addr):
                                  timestamp
                                 FROM messages 
                                 WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>:time
-                                )mes INNER JOIN
+                                )mes 
+                                 INNER JOIN
                                 users
                                 ON mes.login_id=users.id''',
-                            {"user_id": user_id, "time": time})
+                           {"user_id": user_id, "time": time})
             response = 'Success'
             for row in cursor.fetchall():
                 response += row[0] + ":" + row[1] + ":" + row[2]
