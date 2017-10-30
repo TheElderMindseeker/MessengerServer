@@ -10,12 +10,7 @@ def request_handler(sock, addr):
     while True:
         request = recv_from_socket(sock)
         # may do another While True for handshaked case (do not check if handshaked every time)
-        if request == 'test':
-            flag_handshaked = True
-            cursor.execute("SELECT user_id FROM users WHERE login_name='Daniil';")
-            user_id = cursor.fetchone()
-            send_by_socket(sock, 'Successful; Hello Daniil', addr)
-        elif request == 'Vkontakte is dead!':
+        if request == 'Vkontakte is dead!':
             if not flag_handshaked:
                 flag_handshaked = True
                 send_by_socket(sock, 'Long live Telegram!', addr)
@@ -30,7 +25,7 @@ def request_handler(sock, addr):
                 cursor.execute("INSERT INTO users (login_name) VALUES (?);", (login,))
                 connection.commit()
             cursor.execute("SELECT user_id FROM users WHERE login_name=?;", (login,))
-            user_id = cursor.fetchone()
+            user_id = cursor.fetchone()[0]
             send_by_socket(sock, 'Successful', addr)
         elif request == 'Get list of users':
             cursor.execute('''SELECT login_name FROM users;''')
@@ -41,7 +36,7 @@ def request_handler(sock, addr):
         elif request[:12] == 'Get messages' and user_id != -1:
             time = request[13:]
             cursor.execute('''SELECT 
-                             IF(receiver_id=:user_id, receiver_id, sender_id) as login,
+                             CASE WHEN receiver_id=:user_id THEN receiver_id ELSE sender_id END AS login,
                              message_body,
                              timestamp
                             FROM messages 
@@ -49,7 +44,7 @@ def request_handler(sock, addr):
                             {"user_id": user_id, "time": time})
             response = 'Success'
             for row in cursor.fetchall():
-                response += row[0] + ":" + row[1]  + ":"  + row[2]
+                response += ';' + str(row[0]) + ":" + row[1] + ":" + row[2]
             send_by_socket(sock, response, addr)
         elif request[:4] == 'Send':
             receiver_nick, message_body = request[5:].split(';', maxsplit=1)
