@@ -39,14 +39,19 @@ def request_handler(sock, addr):
 
         elif request[:13] == 'Get messages;' and user_id != -1:
             time = request[13:]
-            cursor.execute('''SELECT 
-                             CASE WHEN receiver_id=:user_id THEN receiver_id ELSE sender_id END AS login,
-                             message_body,
-                             timestamp
-                            FROM messages
-                            WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>:time''',
-                            {"user_id": user_id, "time": time})
-
+            cursor.execute('''SELECT login, timestamp, message_body 
+                            FROM(
+                                SELECT 
+                                 IF(receiver_id=:user_id, receiver_id, sender_id) as login_id,
+                                 message_body,
+                                 timestamp
+                                FROM messages 
+                                WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>:time
+                                )mes 
+                                 INNER JOIN
+                                users
+                                ON mes.login_id=users.id''',
+                           {"user_id": user_id, "time": time})
             response = 'Success'
             for row in cursor.fetchall():
                 response += ';' + str(row[0]) + ":" + row[1] + ":" + row[2]
