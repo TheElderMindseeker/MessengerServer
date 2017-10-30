@@ -39,14 +39,14 @@ def request_handler(sock, addr):
 
         elif request[:13] == 'Get messages;' and user_id != -1:
             time = request[13:]
-            cursor.execute('''SELECT login_name, timestamp, message_body 
+            cursor.execute('''SELECT login_name, timestamp, COALESCE(message_body, 'File')
                             FROM(
                                 SELECT 
                                  CASE WHEN receiver_id=:user_id THEN receiver_id ELSE sender_id END as login_id,
                                  message_body,
                                  timestamp
                                 FROM messages 
-                                WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>:time
+                                WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>=:time
                                 )mes 
                                  INNER JOIN
                                 users
@@ -78,8 +78,8 @@ def request_handler(sock, addr):
             answer = 'Successful;' + timestamp
             send_by_socket(sock, answer, addr)
 
-        elif request[:11] == 'Send file;':
-            request = request[11:]
+        elif request[:10] == 'Send file;':
+            request = request[10:]
             receiver_nick, file_name, size, compression, encoding = request.split(';', maxsplit=4)
             receiver_nick = receiver_nick.split(':', maxsplit=1)[1]
             file_name = file_name.split(':', maxsplit=1)[1]
