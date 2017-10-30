@@ -39,22 +39,24 @@ def request_handler(sock, addr):
 
         elif request[:13] == 'Get messages;' and user_id != -1:
             time = request[13:]
-            cursor.execute('''SELECT login_name, timestamp, COALESCE(message_body, 'File')
+            cursor.execute('''SELECT receiver_login, sender_login, timestamp, COALESCE(message_body, 'File')
                             FROM(
                                 SELECT 
-                                 CASE WHEN receiver_id=:user_id THEN receiver_id ELSE sender_id END as login_id,
-                                 message_body,
-                                 timestamp
+                                 receiver_id, sender_id, message_body, timestamp
                                 FROM messages 
                                 WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>=:time
                                 )mes 
                                  INNER JOIN
-                                users
-                                ON mes.login_id=users.user_id''',
+                                (SELECT user_id as receiver_id, login_name as receiver_login FROM users) rec
+                                ON mes.receiver_id=rec.receiver_id
+                                 INNER JOIN
+                                (SELECT user_id as sender_id, login_name as sender_login FROM users) sen
+                                ON mes.sender_id=sen.sender_id
+                                ''',
                            {"user_id": user_id, "time": time})
             response = 'Success'
             for row in cursor.fetchall():
-                response += ';' + str(row[0]) + ":" + row[1] + ":" + row[2]
+                response += ';' + row[0] + ":" + row[1] + ":" + row[2] + ":" + row[3]
             send_by_socket(sock, response, addr)
 
         elif request[:5] == 'Send;':
