@@ -39,7 +39,7 @@ def request_handler(sock, addr):
 
         elif request[:13] == 'Get messages;' and user_id != -1:
             time = request[13:]
-            cursor.execute('''SELECT receiver_login, sender_login, timestamp, COALESCE(message_body, 'File')
+            cursor.execute('''SELECT sender_login, receiver_login, timestamp, COALESCE(message_body, 'File')
                             FROM(
                                 SELECT 
                                  receiver_id, sender_id, message_body, timestamp
@@ -56,7 +56,7 @@ def request_handler(sock, addr):
                            {"user_id": user_id, "time": time})
             response = 'Success'
             for row in cursor.fetchall():
-                response += ';' + row[0] + ":" + row[1] + ":" + row[2] + ":" + row[3]
+                response += ';Sender:' + row[0] + ";Receiver:" + row[1] + ";timestamp:" + row[2] + ";" + row[3]
             send_by_socket(sock, response, addr)
 
         elif request[:5] == 'Send;':
