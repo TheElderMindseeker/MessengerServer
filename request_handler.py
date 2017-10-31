@@ -1,4 +1,5 @@
 import sqlite3
+from application_layer import *
 
 
 def request_handler(sock, addr):
@@ -7,187 +8,86 @@ def request_handler(sock, addr):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
 
-    while True:
+    exit_cond = False
+    while not exit_cond:
         request = recv_from_socket(sock)
 
         if request == 'Vkontakte is dead!':
-            if not flag_handshaked:
-                flag_handshaked = True
-                send_by_socket(sock, 'Long live Telegram!', addr)
-            else:
-                issue_error_message(sock, '', addr)
-                break
+            exit_cond, flag_handshaked = is_error(sock, addr, dispatch_handshake, flag_handshaked=flag_handshaked)
+        elif flag_handshaked:
+            if request.startswith('Login;'):
+                exit_cond, user_id = is_error(sock, addr, dispatch_login, cursor, connection, login=request[6:])
+            elif request.startswith('Get list of users'):
+                exit_cond = is_error(sock, addr, dispatch_users, cursor)
+            elif request.startswith('Get messages;') and user_id != -1:
+                time = request[13:]
+                exit_cond = is_error(sock, addr, dispatch_messages, cursor, time=time, user_id=user_id)
+            elif request.startswith('Send;'):
+                receiver_id, message_body = request[5:].split(';', maxsplit=1)
+                receiver_id = int(receiver_id)
+                exit_cond = is_error(sock, addr, dispatch_send, cursor, connection, user_id=user_id,
+                                     receiver_id=receiver_id, message_body=message_body)
+            elif request.startswith('Send file;'):
+                request = request[10:]
+                receiver_nick, file_name, size, compression, encoding = request.split(';', maxsplit=4)
+                receiver_nick = receiver_nick.split(':', maxsplit=1)[1]
+                file_name = file_name.split(':', maxsplit=1)[1]
+                size = int(size.split(':', maxsplit=1)[1])
+                compression = compression.split(':', maxsplit=1)[1]
+                encoding = encoding.split(':', maxsplit=1)[1]
 
-        elif request[:6] == 'Login:' and user_id == -1:
-            login = request.split(':', maxsplit=1)[1]
-            cursor.execute("SELECT count(*) FROM users WHERE login_name=?;", (login,))
-            count = cursor.fetchone()
-            if count[0] == 0:
-                cursor.execute("INSERT INTO users (login_name) VALUES (?);", (login,))
+                send_by_socket(sock, 'Successful', addr)
+                file = recv_file_from_socket(sock, size)
+                cursor.execute('''INSERT INTO files (file_name, file_size, compression_type, encoding_type) VALUES (?, ?, ?, ?);''',
+                               (file_name, size, compression, encoding))
+                file_id = cursor.lastrowid
+                path = 'files/' + file_name
+                output = open(path, 'bw')
+                output.write(file)
+                output.close()
+
+                cursor.execute('''SELECT user_id FROM users WHERE login_name=?''', (receiver_nick,))
+                receiver_id = cursor.fetchone()
+                if receiver_id is None:
+                    issue_error_message(sock, 'Unknown User', addr)
+                    continue
+                receiver_id = receiver_id[0]
+
+                cursor.execute('''INSERT INTO messages
+                                            (sender_id, receiver_id, file_id, timestamp)
+                                              VALUES
+                                            (?, ?, ?, datetime(\'now\'))''', (user_id, receiver_id, file_id))
                 connection.commit()
 
-            cursor.execute("SELECT user_id FROM users WHERE login_name=?;", (login,))
-            user_id = cursor.fetchone()[0]
-            send_by_socket(sock, 'Successful', addr)
+                cursor.execute('''SELECT timestamp FROM messages WHERE message_id=last_insert_rowid()''')
+                timestamp = cursor.fetchone()[0]
+                answer = 'Successful;' + timestamp
+                send_by_socket(sock, answer, addr)
 
-        elif request == 'Get list of users':
-            cursor.execute('''SELECT login_name FROM users;''')
-            response = 'Success'
-            for row in cursor.fetchall():
-                response += ';' + row[0]
-            send_by_socket(sock, response, addr)
+            elif request.startswith('Recv file;'):
+                file_id = int(request[10:])
+                cursor.execute('''SELECT file_size, compression_type, encoding_type, file_name 
+                                          FROM files WHERE file_id=?''', (file_id,))
+                row = cursor.fetchone()
+                answer = 'Successful;'
+                answer += 'Size:' + str(row[0]) + ";"
+                answer += 'Compression-Type:' + str(row[1]) + ";"
+                answer += 'Coding-Type:' + str(row[2]) + ";"
+                send_by_socket(sock, answer, addr)
 
-        elif request[:13] == 'Get messages;' and user_id != -1:
-            time = request[13:]
-            cursor.execute('''SELECT sender_login, receiver_login, timestamp, COALESCE(message_body, 'File')
-                            FROM(
-                                SELECT 
-                                 receiver_id, sender_id, message_body, timestamp
-                                FROM messages 
-                                WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>=:time
-                                )mes 
-                                 INNER JOIN
-                                (SELECT user_id as receiver_id, login_name as receiver_login FROM users) rec
-                                ON mes.receiver_id=rec.receiver_id
-                                 INNER JOIN
-                                (SELECT user_id as sender_id, login_name as sender_login FROM users) sen
-                                ON mes.sender_id=sen.sender_id
-                                ''',
-                           {"user_id": user_id, "time": time})
-            response = 'Success'
-            for row in cursor.fetchall():
-                response += ';Sender:' + row[0] + ";Receiver:" + row[1] + ";timestamp:" + row[2] + ";" + row[3]
-            send_by_socket(sock, response, addr)
+                request = recv_from_socket(sock)
+                if request == 'Accepting;':
+                    path = 'files/' + str(row[3])
+                    file = open(path, "rb")
+                    send_file_by_socket(sock, file.read(), addr)
 
-        elif request[:5] == 'Send;':
-            receiver_nick, message_body = request[5:].split(';', maxsplit=1)
-
-            cursor.execute('''SELECT user_id FROM users WHERE login_name=?''', (receiver_nick,))
-            receiver_id = cursor.fetchone()
-            if receiver_id is None:
-                issue_error_message(sock, 'Unknown User', addr)
-                continue
-            receiver_id = receiver_id[0]
-
-            cursor.execute('''INSERT INTO messages
-                            (sender_id, receiver_id, timestamp, message_body)
-                              VALUES
-                            (?, ?, datetime(\'now\'), ?)''', (user_id, receiver_id, message_body))
-            connection.commit()
-
-            cursor.execute('''SELECT timestamp FROM messages WHERE message_id=last_insert_rowid()''')
-            timestamp = cursor.fetchone()[0]
-            answer = 'Successful;' + timestamp
-            send_by_socket(sock, answer, addr)
-
-        elif request[:10] == 'Send file;':
-            request = request[10:]
-            receiver_nick, file_name, size, compression, encoding = request.split(';', maxsplit=4)
-            receiver_nick = receiver_nick.split(':', maxsplit=1)[1]
-            file_name = file_name.split(':', maxsplit=1)[1]
-            size = int(size.split(':', maxsplit=1)[1])
-            compression = compression.split(':', maxsplit=1)[1]
-            encoding = encoding.split(':', maxsplit=1)[1]
-
-            send_by_socket(sock, 'Successful', addr)
-            file = recv_file_from_socket(sock, size)
-            cursor.execute('''INSERT INTO files (file_name, file_size, compression_type, encoding_type) VALUES (?, ?, ?, ?);''',
-                           (file_name, size, compression, encoding))
-            file_id = cursor.lastrowid
-            path = 'files/' + file_name
-            output = open(path, 'bw')
-            output.write(file)
-            output.close()
-
-            cursor.execute('''SELECT user_id FROM users WHERE login_name=?''', (receiver_nick,))
-            receiver_id = cursor.fetchone()
-            if receiver_id is None:
-                issue_error_message(sock, 'Unknown User', addr)
-                continue
-            receiver_id = receiver_id[0]
-
-            cursor.execute('''INSERT INTO messages
-                                        (sender_id, receiver_id, file_id, timestamp)
-                                          VALUES
-                                        (?, ?, ?, datetime(\'now\'))''', (user_id, receiver_id, file_id))
-            connection.commit()
-
-            cursor.execute('''SELECT timestamp FROM messages WHERE message_id=last_insert_rowid()''')
-            timestamp = cursor.fetchone()[0]
-            answer = 'Successful;' + timestamp
-            send_by_socket(sock, answer, addr)
-
-        elif request[:10] == 'Recv file;':
-            file_id = int(request[10:])
-            cursor.execute('''SELECT file_size, compression_type, encoding_type, file_name 
-                                      FROM files WHERE file_id=?''', (file_id,))
-            row = cursor.fetchone()
-            answer = 'Successful;'
-            answer += 'Size:' + str(row[0]) + ";"
-            answer += 'Compression-Type:' + str(row[1]) + ";"
-            answer += 'Coding-Type:' + str(row[2]) + ";"
-            send_by_socket(sock, answer, addr)
-
-            request = recv_from_socket(sock)
-            if request == 'Accepting;':
-                path = 'files/' + str(row[3])
-                file = open(path, "rb")
-                send_file_by_socket(sock, file.read(), addr)
-
-        elif request == 'Disconnect':
-            send_by_socket(sock, 'Bye!', addr)
-            break
+            elif request == 'Disconnect':
+                send_by_socket(sock, 'Bye!', addr)
+                exit_cond = True
+            else:
+                issue_error_message(sock, 'Unknown Request', addr)
+                exit_cond = True
         else:
-            issue_error_message(sock, 'Unknown Request', addr)
-            break
+            exit_cond = True
 
     sock.close()
-
-
-def send_by_socket(socket, string, address=None):
-    if address is None:
-        socket.sendall(bytes(string + '\n', 'ascii'))
-    else:
-        socket.sendto(bytes(string + '\n', 'ascii'), address)
-
-
-def issue_error_message(socket, error, address=None):
-    if address is None:
-        socket.sendall(bytes('Error;' + error + '\n', 'ascii'))
-    else:
-        socket.sendto(bytes('Error;' + error + '\n', 'ascii'), address)
-
-
-def recv_from_socket(socket, address=None):
-    buffer = b''
-    while str(buffer, 'ascii').find('\n') == -1:
-        if address is None:
-            buffer += socket.recv(1024)
-        else:
-            bs, addr = socket.recvfrom(1024)
-            if addr != address:
-                raise ValueError
-            buffer += bs
-
-    s = str(buffer, 'ascii')
-    s = s[:s.find('\n')]
-
-    return s
-
-
-def recv_file_from_socket(socket, file_size, address=None):
-    if address is None:
-        buffer = socket.recv(file_size)
-    else:
-        bs, addr = socket.recvfrom(file_size)
-        if addr != address:
-            raise ValueError
-        buffer = bs
-    return buffer
-
-
-def send_file_by_socket(socket, string, address=None):
-    if address is None:
-        socket.sendall(string)
-    else:
-        socket.sendto(string, address)
