@@ -1,7 +1,7 @@
 from transport_layer import *
 
 
-def is_error (sock, addr, dispatcher, *args, **kwargs):
+def is_error(sock, addr, dispatcher, *args, **kwargs):
     dispatcher_type, error, *result = dispatcher(sock, addr, *args, **kwargs)
     if dispatcher_type == 'handshake':
         if error:
@@ -82,24 +82,14 @@ def dispatch_messages(sock, addr, *args, **kwargs):
     if user_id < 1:
         return dispatcher_type, True, 'Unlogged User'
 
-    cursor.execute('''SELECT datetime('now') AS current_timestamp;''')
-    current_timestamp = cursor.fetchone()[0]
-    cursor.execute('''SELECT sender_login, receiver_login, timestamp, COALESCE(message_body, 'File')
-                      FROM(
-                          SELECT receiver_id, sender_id, message_body, timestamp
+    cursor.execute('''SELECT sender_id, receiver_id, timestamp, COALESCE(message_body, 'File')
                           FROM messages
-                          WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>=:time) mes
-                          INNER JOIN
-                            (SELECT user_id as receiver_id, login_name as receiver_login FROM users) rec
-                          ON mes.receiver_id=rec.receiver_id
-                          INNER JOIN
-                            (SELECT user_id as sender_id, login_name as sender_login FROM users) sen
-                          ON mes.sender_id=sen.sender_id;''',
+                          WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>=:time''',
                    {"user_id": user_id, "time": time})
 
     response = 'Successful;' + current_timestamp
     for row in cursor.fetchall():
-        response += ';' + row[0] + "|" + row[1] + "|" + row[2] + "|" + row[3]
+        response += ';' + str(row[0]) + "|" + str(row[1]) + "|" + row[2] + "|" + row[3]
     send_by_socket(sock, response, addr)
 
     return dispatcher_type, False
