@@ -95,14 +95,20 @@ def dispatch_messages(sock, addr, *args, **kwargs):
     cursor.execute('''SELECT datetime('now') AS current_timestamp''')
     current_timestamp = cursor.fetchone()[0]
 
-    cursor.execute('''SELECT sender_id, receiver_id, timestamp, COALESCE(message_body, ''), COALESCE(file_id, '')
-                          FROM messages
-                          WHERE (receiver_id = :user_id OR sender_id = :user_id) AND timestamp >= :time''',
+    cursor.execute('''SELECT sender_id, receiver_id, timestamp, 
+                        COALESCE(message_body, ''), COALESCE(file_id, ''), COALESCE(file_name, '')
+                        FROM
+                            (SELECT sender_id, receiver_id, timestamp, message_body, file_id as mess_file_id
+                            FROM messages
+                            WHERE (receiver_id = :user_id OR sender_id = :user_id) AND timestamp >= :time) mess
+                            LEFT JOIN
+                            (SELECT file_name, file_id FROM files) fil
+                            ON mess_file_id=file_id''',
                    {"user_id": user_id, "time": time})
 
     response = 'Successful;' + current_timestamp
     for row in cursor.fetchall():
-        response += ';' + str(row[0]) + '|' + str(row[1]) + '|' + row[2] + '|' + row[3] + '|' + str(row[4])
+        response += ';' + str(row[0]) + '|' + str(row[1]) + '|' + row[2] + '|' + row[3] + '|' + str(row[4]) + '|' + str(row[5])
     send_by_socket(sock, response, addr)
 
     return dispatcher_type, False

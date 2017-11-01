@@ -1,4 +1,4 @@
-terminat0r = '\0'
+terminat0r = '\n'
 
 
 def send_by_socket(socket, string, address=None):
