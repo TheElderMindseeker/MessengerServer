@@ -82,6 +82,9 @@ def dispatch_messages(sock, addr, *args, **kwargs):
     if user_id < 1:
         return dispatcher_type, True, 'Unlogged User'
 
+    cursor.execute('''SELECT datetime('now') AS current_timestamp''')
+    current_timestamp = cursor.fetchone()[0]
+
     cursor.execute('''SELECT sender_id, receiver_id, timestamp, COALESCE(message_body, 'File')
                           FROM messages
                           WHERE (receiver_id=:user_id OR sender_id=:user_id) AND timestamp>=:time''',
