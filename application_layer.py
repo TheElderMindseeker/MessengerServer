@@ -82,6 +82,8 @@ def dispatch_messages(sock, addr, *args, **kwargs):
     if user_id < 1:
         return dispatcher_type, True, 'Unlogged User'
 
+    cursor.execute('''SELECT datetime('now') AS current_timestamp;''')
+    current_timestamp = cursor.fetchone()[0]
     cursor.execute('''SELECT sender_login, receiver_login, timestamp, COALESCE(message_body, 'File')
                       FROM(
                           SELECT receiver_id, sender_id, message_body, timestamp
@@ -92,10 +94,8 @@ def dispatch_messages(sock, addr, *args, **kwargs):
                           ON mes.receiver_id=rec.receiver_id
                           INNER JOIN
                             (SELECT user_id as sender_id, login_name as sender_login FROM users) sen
-                          ON mes.sender_id=sen.sender_id''',
+                          ON mes.sender_id=sen.sender_id;''',
                    {"user_id": user_id, "time": time})
-    cursor.execute('''SELECT datetime('now') AS current_timestamp;''')
-    current_timestamp = cursor.fetchone()[0]
 
     response = 'Successful;' + current_timestamp
     for row in cursor.fetchall():
