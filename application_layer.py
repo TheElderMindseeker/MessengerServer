@@ -94,7 +94,10 @@ def dispatch_messages(sock, addr, *args, **kwargs):
                             (SELECT user_id as sender_id, login_name as sender_login FROM users) sen
                           ON mes.sender_id=sen.sender_id''',
                    {"user_id": user_id, "time": time})
-    response = 'Success'
+    cursor.execute('''SELECT datetime('now') AS current_timestamp;''')
+    current_timestamp = cursor.fetchone()[0]
+
+    response = 'Successful;' + current_timestamp
     for row in cursor.fetchall():
         response += ';' + row[0] + "|" + row[1] + "|" + row[2] + "|" + row[3]
     send_by_socket(sock, response, addr)
