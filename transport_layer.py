@@ -1,8 +1,11 @@
+terminat0r = '\n'
+
+
 def send_by_socket(socket, string, address=None):
     if address is None:
-        socket.sendall(bytes(string + '\n', 'ascii'))
+        socket.sendall(bytes(string + terminat0r, 'ascii'))
     else:
-        socket.sendto(bytes(string + '\n', 'ascii'), address)
+        socket.sendto(bytes(string + terminat0r, 'ascii'), address)
 
 
 def issue_error_message(socket, error, address=None):
@@ -14,7 +17,7 @@ def issue_error_message(socket, error, address=None):
 
 def recv_from_socket(socket, address=None):
     buffer = b''
-    while str(buffer, 'ascii').find('\n') == -1:
+    while str(buffer, 'ascii').find(terminat0r) == -1:
         if address is None:
             buffer += socket.recv(1024)
         else:
@@ -24,7 +27,7 @@ def recv_from_socket(socket, address=None):
             buffer += bs
 
     s = str(buffer, 'ascii')
-    s = s[:s.find('\n')]
+    s = s[:s.find(terminat0r)]
 
     return s
 
