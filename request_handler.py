@@ -14,19 +14,29 @@ def request_handler(sock, addr):
 
         if request == 'Vkontakte is dead!':
             exit_cond, flag_handshaked = is_error(sock, addr, dispatch_handshake, flag_handshaked=flag_handshaked)
+            # TODO: temporary
+            exit_cond = False
         elif flag_handshaked:
             if request.startswith('Login;'):
                 exit_cond, user_id = is_error(sock, addr, dispatch_login, cursor, connection, login=request[6:])
+                # TODO: temporary
+                exit_cond = False
             elif request.startswith('Get list of users'):
                 exit_cond = is_error(sock, addr, dispatch_users, cursor)
+                # TODO: temporary
+                exit_cond = False
             elif request.startswith('Get messages;') and user_id != -1:
                 time = request[13:]
                 exit_cond = is_error(sock, addr, dispatch_messages, cursor, time=time, user_id=user_id)
+                # TODO: temporary
+                exit_cond = False
             elif request.startswith('Send;'):
                 receiver_id, message_body = request[5:].split(';', maxsplit=1)
                 receiver_id = int(receiver_id)
                 exit_cond = is_error(sock, addr, dispatch_send, cursor, connection, user_id=user_id,
                                      receiver_id=receiver_id, message_body=message_body)
+                # TODO: temporary
+                exit_cond = False
             elif request.startswith('Send file;'):
                 request = request[10:]
                 receiver_nick, file_name, size, compression, encoding = request.split(';', maxsplit=4)
@@ -87,7 +97,11 @@ def request_handler(sock, addr):
             else:
                 issue_error_message(sock, 'Unknown Request', addr)
                 exit_cond = True
+                # TODO: temporary
+                exit_cond = False
         else:
             exit_cond = True
+            # TODO: temporary
+            exit_cond = False
 
     sock.close()

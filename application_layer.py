@@ -62,7 +62,7 @@ def dispatch_users(sock, addr, *args, **kwargs):
     cursor = args[0]
 
     cursor.execute('''SELECT * FROM users;''')
-    response = 'Success'
+    response = 'Successful'
     for row in cursor.fetchall():
         response += ';' + str(row[0]) + '|' + row[1]
     send_by_socket(sock, response, addr)
