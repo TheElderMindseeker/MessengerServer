@@ -1,11 +1,12 @@
 terminat0r = '\0'
+encoding = 'utf-8'
 
 
 def send_by_socket(socket, string, address=None):
     if address is None:
-        socket.sendall(bytes(string + terminat0r, 'ascii'))
+        socket.sendall(bytes(string + terminat0r, encoding))
     else:
-        socket.sendto(bytes(string + terminat0r, 'ascii'), address)
+        socket.sendto(bytes(string + terminat0r, encoding), address)
 
 
 def issue_error_message(socket, error, address=None):
@@ -17,7 +18,7 @@ def issue_error_message(socket, error, address=None):
 
 def recv_from_socket(socket, address=None):
     buffer = b''
-    while str(buffer, 'ascii').find(terminat0r) == -1:
+    while str(buffer, encoding).find(terminat0r) == -1:
         if address is None:
             buffer += socket.recv(1024)
         else:
@@ -26,7 +27,7 @@ def recv_from_socket(socket, address=None):
                 raise ValueError
             buffer += bs
 
-    s = str(buffer, 'ascii')
+    s = str(buffer, encoding)
     s = s[:s.find(terminat0r)]
 
     return s
