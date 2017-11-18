@@ -3,7 +3,7 @@ import sqlite3
 from application_layer import *
 
 
-def request_handler(sock, addr):
+def request_handler(sock, addr, noise_level):
     flag_handshaked = False
     user_id = -1
     connection = sqlite3.connect('database.sqlite')
@@ -49,7 +49,7 @@ def request_handler(sock, addr):
                                      file_size=file_size, compression=compression, encoding=encoding)
             elif request.startswith('Recv file;'):
                 file_id = int(request[10:])
-                exit_cond = is_error(sock, addr, dispatch_recv_file, cursor, file_id=file_id)
+                exit_cond = is_error(sock, addr, dispatch_recv_file, cursor, file_id=file_id, noise_level=noise_level)
                 # TODO: temporary
                 exit_cond = False
             elif request == 'Disconnect':

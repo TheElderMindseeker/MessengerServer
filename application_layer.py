@@ -1,3 +1,4 @@
+from random import uniform
 from transport_layer import *
 
 
@@ -190,6 +191,7 @@ def dispatch_recv_file(sock, addr, *args, **kwargs):
     cursor = args[0]
 
     file_id = kwargs['file_id']
+    noise_level = kwargs['noise_level']
 
     if file_id < 1:
         return dispatcher_type, True, 'Unknown file'
@@ -208,6 +210,14 @@ def dispatch_recv_file(sock, addr, *args, **kwargs):
     if request == 'Accepting':
         path = 'files/' + str(file_id) + '.file'
         file = open(path, "rb")
-        send_file_by_socket(sock, file.read(), addr)
+        if noise_level > 1e-10:
+            buffer = bytearray(file.read())
+            for byte in range(len(buffer)):
+                for i in range(8):
+                    if uniform(0, 1) < noise_level:
+                        buffer[byte]= buffer[byte] ^ (1 << i)
+            send_file_by_socket(sock, bytes(buffer), addr)
+        else:
+            send_file_by_socket(sock, file.read(), addr)
 
     return dispatcher_type, False
