@@ -34,13 +34,15 @@ def recv_from_socket(socket, address=None):
 
 
 def recv_file_from_socket(socket, file_size, address=None):
-    if address is None:
-        buffer = socket.recv(file_size)
-    else:
-        bs, addr = socket.recvfrom(file_size)
-        if addr != address:
-            raise ValueError
-        buffer = bs
+    buffer = bytearray()
+    while len(buffer) < file_size:
+        if address is None:
+            buffer.append(socket.recv(1024))
+        else:
+            bs, addr = socket.recvfrom(1024)
+            if addr != address:
+                raise ValueError
+            buffer.append(bs)
     return buffer
 
 

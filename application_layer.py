@@ -170,7 +170,7 @@ def dispatch_send_file(sock, addr, *args, **kwargs):
     file_id = cursor.lastrowid
     path = 'files/' + str(file_id) + '.file'
     output = open(path, 'bw')
-    output.write(file)
+    output.write(bytes(file))
     output.close()
 
     cursor.execute('''INSERT INTO messages (sender_id, receiver_id, file_id, timestamp, message_body)
